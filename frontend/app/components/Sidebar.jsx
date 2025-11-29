@@ -52,12 +52,16 @@ function Sidebar({
     <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar-docs">
         <ul className="space-y-3">
           {documents.length > 0 ? (
-            documents.map((doc) => (
-              <li key={doc} className="transform transition-all duration-300 hover:scale-[1.02]">
+            documents.map((doc) => {
+              const docName = typeof doc === 'string' ? doc : doc.originalName;
+              const isSelected = selectedPdf === docName;
+
+              return (
+              <li key={docName} className="transform transition-all duration-300 hover:scale-[1.02]">
                 <button
-                  onClick={() => onPdfSelect?.(doc)}
+                  onClick={() => onPdfSelect?.(docName)}
                   className={`relative w-full text-left p-4 rounded-xl border-2 transition-all duration-300 group overflow-hidden ${
-                    selectedPdf === doc
+                    isSelected
                       ? 'bg-gradient-to-br from-cyan-100/90 to-teal-100/90 border-cyan-400/70 shadow-xl ring-2 ring-cyan-300/50'
                       : 'bg-white/60 backdrop-blur-sm border-cyan-200/50 hover:bg-gradient-to-br hover:from-cyan-50/80 hover:to-teal-50/80 hover:border-cyan-300/70 hover:shadow-lg'
                   }`}
@@ -67,7 +71,7 @@ function Sidebar({
                   
                   <div className="relative flex items-start gap-3">
                     <div className={`p-2 rounded-xl flex-shrink-0 shadow-sm ${
-                      selectedPdf === doc 
+                      isSelected 
                         ? 'bg-gradient-to-br from-cyan-500 to-teal-600' 
                         : 'bg-gradient-to-br from-cyan-400/70 to-teal-500/70 group-hover:from-cyan-500 group-hover:to-teal-600'
                     } transition-all duration-300`}>
@@ -75,21 +79,21 @@ function Sidebar({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`font-bold text-sm leading-relaxed break-words ${
-                        selectedPdf === doc 
+                        isSelected 
                           ? 'text-cyan-900' 
                           : 'text-cyan-800 group-hover:text-cyan-900'
                       } transition-colors duration-200`}>
-                        {doc.replace('.pdf', '')}
+                        {docName.replace('.pdf', '')}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
-                          selectedPdf === doc
+                          isSelected
                             ? 'bg-cyan-500/20 text-cyan-700'
                             : 'bg-cyan-500/10 text-cyan-600 group-hover:bg-cyan-500/20'
                         } transition-colors duration-200`}>
                           PDF
                         </span>
-                        {selectedPdf === doc && (
+                        {isSelected && (
                           <span className="flex items-center gap-1 text-xs text-emerald-600 font-semibold">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
                             Active
@@ -100,7 +104,9 @@ function Sidebar({
                   </div>
                 </button>
               </li>
-            ))
+              ); 
+            })
+
           ) : (
             <li className="text-center py-12 animate-fadeIn">
               <div className="relative bg-white/60 backdrop-blur-md border-2 border-cyan-200/50 rounded-2xl p-8 overflow-hidden">

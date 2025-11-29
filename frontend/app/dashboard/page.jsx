@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { useAuth } from "@/app/context/AuthContext";
-import { getHistory } from '@/app/lib/api';
+import { getHistory, getCollectionDetails } from '@/app/lib/api';
 import { 
   Loader2, 
   FileText, 
@@ -52,8 +52,39 @@ function DashboardPageContent() {
     }
   };
 
-  const handleCollectionClick = (collectionId) => {
-    router.push(`/pdfviewer?collectionId=${collectionId}`);
+  const [isNavigating, setIsNavigating] = useState(null); // new state for loading
+
+  const handleCollectionClick = async (collection) => {
+    if (!collection || isNavigating) return;
+    const id = collection.collectionId || collection._id;
+    if (!id) return;
+
+    setIsNavigating(id); // Set loading state for this collection
+    try {
+      const collectionDetails = await getCollectionDetails(id);
+      if (collectionDetails) {
+        // Save the full collection details to sessionStorage
+        sessionStorage.setItem('analysisData', JSON.stringify(collectionDetails));
+
+        // Find the first document to use in the URL
+        const firstDoc = collectionDetails.documents && collectionDetails.documents[0];
+        const fileName = firstDoc ? (firstDoc.originalName || firstDoc.storedName) : null;
+
+        if (fileName) {
+          router.push(`/pdfviewer?file=${encodeURIComponent(fileName)}`);
+        } else {
+          // Fallback if no documents are in the collection
+          router.push('/pdfviewer');
+        }
+      } else {
+        throw new Error('Collection details not found.');
+      }
+    } catch (err) {
+      setError(err?.message || 'Failed to load collection details');
+      console.error('Navigation error:', err);
+      setIsNavigating(null); // Reset loading state on error
+    }
+    // No need to reset isNavigating on success, as the page will change
   };
 
   const formatDate = (dateString) => {
@@ -112,7 +143,7 @@ function DashboardPageContent() {
             {/* Logo/Brand */}
             <div className="flex items-center space-x-4">
               <div 
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/')}
                 className="cursor-pointer flex items-center space-x-2 group"
               >
                 <div className="w-10 h-10 bg-white/20 rounded-lg backdrop-blur-sm border border-white/30 flex items-center justify-center group-hover:bg-white/30 transition-all duration-200">
@@ -234,14 +265,15 @@ function DashboardPageContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {collections.map((collection) => (
               <div
-                key={collection.collectionId}
-                onClick={() => handleCollectionClick(collection.collectionId)}
-                className="bg-white rounded-xl shadow-lg border border-red-200 hover:shadow-2xl hover:border-red-400 transition-all duration-200 cursor-pointer group overflow-hidden"
+                key={collection.collectionId || collection._id}
+                onClick={() => handleCollectionClick(collection)}
+                disabled={isNavigating === (collection.collectionId || collection._id)}
+                className="bg-gradient-to-br from-white/70 to-white/50 backdrop-blur-lg rounded-2xl shadow-lg border border-white/30 hover:shadow-red-500/20 hover:shadow-2xl transition-all duration-300 cursor-pointer group overflow-hidden transform hover:-translate-y-2"
               >
                 {/* Card Header */}
-                <div className="bg-gradient-to-r from-red-600 to-red-700 p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-lg font-bold text-white line-clamp-2 group-hover:text-red-100 transition-colors">
+                <div className="p-5 border-b border-white/20">
+                  <div className="flex items-start justify-between">
+                    <h3 className="text-lg font-extrabold text-red-800 line-clamp-2 group-hover:text-red-600 transition-colors">
                       {collection.name || 'Unnamed Collection'}
                     </h3>
                     {getStatusBadge(collection.status || 'idle')}
@@ -249,48 +281,56 @@ function DashboardPageContent() {
                 </div>
 
                 {/* Card Body */}
-                <div className="p-5 space-y-4">
+                <div className="px-5 pb-5 space-y-4">
                   {/* Persona */}
                   {collection.persona && (
-                    <div className="flex items-start space-x-3">
-                      <User className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 flex-shrink-0 bg-red-100/70 rounded-full flex items-center justify-center">
+                        <User className="w-5 h-5 text-red-600" />
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-red-800 uppercase tracking-wide">Persona</p>
-                        <p className="text-sm text-red-700 line-clamp-2">{collection.persona}</p>
+                        <p className="text-xs font-semibold text-red-500 uppercase tracking-wider">Persona</p>
+                        <p className="text-sm font-medium text-red-800 line-clamp-2">{collection.persona}</p>
                       </div>
                     </div>
                   )}
 
                   {/* Job to be Done */}
                   {collection.jobToBeDone && (
-                    <div className="flex items-start space-x-3">
-                      <Briefcase className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 flex-shrink-0 bg-red-100/70 rounded-full flex items-center justify-center">
+                        <Briefcase className="w-5 h-5 text-red-600" />
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-red-800 uppercase tracking-wide">Objective</p>
-                        <p className="text-sm text-red-700 line-clamp-2">{collection.jobToBeDone}</p>
+                        <p className="text-xs font-semibold text-red-500 uppercase tracking-wider">Objective</p>
+                        <p className="text-sm font-medium text-red-800 line-clamp-2">{collection.jobToBeDone}</p>
                       </div>
                     </div>
                   )}
 
                   {/* Documents Count */}
-                  <div className="flex items-center space-x-3">
-                    <FileText className="w-5 h-5 text-red-600 flex-shrink-0" />
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 flex-shrink-0 bg-red-100/70 rounded-full flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-red-600" />
+                    </div>
                     <div>
-                      <p className="text-xs font-semibold text-red-800 uppercase tracking-wide">Documents</p>
-                      <p className="text-sm text-red-700">{collection.documentsCount || 0} file(s)</p>
+                      <p className="text-xs font-semibold text-red-500 uppercase tracking-wider">Documents</p>
+                      <p className="text-sm font-medium text-red-800">{collection.documentsCount || 0} file(s)</p>
                     </div>
                   </div>
 
                   {/* Dates */}
-                  <div className="flex items-center space-x-3 pt-2 border-t border-red-100">
-                    <Calendar className="w-5 h-5 text-red-600 flex-shrink-0" />
+                  <div className="flex items-start space-x-4 pt-4 border-t border-white/20">
+                    <div className="w-10 h-10 flex-shrink-0 bg-red-100/70 rounded-full flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-red-600" />
+                    </div>
                     <div className="flex-1">
-                      <p className="text-xs font-semibold text-red-800 uppercase tracking-wide">Created</p>
-                      <p className="text-sm text-red-700">{formatDate(collection.createdAt)}</p>
+                      <p className="text-xs font-semibold text-red-500 uppercase tracking-wider">Created</p>
+                      <p className="text-sm font-medium text-red-800">{formatDate(collection.createdAt)}</p>
                       {collection.lastRunAt && (
                         <>
-                          <p className="text-xs font-semibold text-red-800 uppercase tracking-wide mt-2">Last Run</p>
-                          <p className="text-sm text-red-700">{formatDate(collection.lastRunAt)}</p>
+                          <p className="text-xs font-semibold text-red-500 uppercase tracking-wider mt-2">Last Run</p>
+                          <p className="text-sm font-medium text-red-800">{formatDate(collection.lastRunAt)}</p>
                         </>
                       )}
                     </div>
@@ -298,9 +338,9 @@ function DashboardPageContent() {
                 </div>
 
                 {/* Card Footer */}
-                <div className="px-5 py-3 bg-red-50 border-t border-red-100 flex items-center justify-between group-hover:bg-red-100 transition-colors">
-                  <span className="text-sm font-medium text-red-700">View Collection</span>
-                  <ArrowRight className="w-5 h-5 text-red-600 group-hover:translate-x-1 transition-transform" />
+                <div className="px-5 py-4 bg-white/10 border-t border-white/20 flex items-center justify-center group-hover:bg-white/20 transition-colors duration-300">
+                  <span className="text-sm font-bold text-red-700 group-hover:text-red-800 transition-colors">View Collection</span>
+                  <ArrowRight className="w-5 h-5 text-red-600 ml-2 transform transition-transform duration-300 group-hover:translate-x-1 group-hover:scale-110" />
                 </div>
               </div>
             ))}

@@ -288,7 +288,7 @@
 
           res.status(201).json({
             collectionName,
-            collectionId: collectionDoc ? collectionDoc._id : null,
+            collectionId: collectionDoc ? collectionDoc.collectionId : null,
             analysisData: analysisResult,
             documents: documentsForDb,
             cloud: (s3Helpers && process.env.S3_BUCKET && process.env.AWS_REGION) ? {
@@ -319,17 +319,39 @@
           if (!col) return res.status(404).json({ error: 'Collection not found for this user' });
 
           // Build accessible URLs for each document:
-          // - use publicUrl (S3 presigned) if present
-          // - otherwise point to the frontend public pdfs folder: ${protocol}://${host}/pdfs/<filename>
+          // - If stored in S3 (has storedName), generate fresh presigned URL
+          // - Otherwise point to the frontend public pdfs folder
           const hostBase = `${req.protocol}://${req.get('host')}`;
-          const docsWithUrls = (col.documents || []).map(d => {
+          const docsWithUrls = await Promise.all((col.documents || []).map(async (d) => {
             const originalName = d.originalName || '';
             const storedName = d.storedName || '';
             const filenameFallback = originalName || path.basename(storedName) || '';
-            const localUrl = filenameFallback ? `${hostBase}/pdfs/${encodeURIComponent(filenameFallback)}` : null;
-            const accessibleUrl = d.publicUrl || localUrl;
+            
+            let accessibleUrl = null;
+            
+            // If document is stored in S3, generate fresh presigned URL
+            if (storedName && s3Helpers && process.env.S3_BUCKET && process.env.AWS_REGION) {
+              try {
+                accessibleUrl = await s3Helpers.s3Presign(storedName, 60 * 60); // 1 hour expiry
+              } catch (e) {
+                console.warn('Failed to generate presigned URL for', storedName, e && e.message ? e.message : String(e));
+                // Fall through to local URL fallback
+              }
+            }
+            
+            // Fallback to local public PDFs folder or original publicUrl
+            if (!accessibleUrl) {
+              if (d.publicUrl && !d.publicUrl.includes('localhost:5001')) {
+                // Use existing publicUrl if it's not pointing to backend
+                accessibleUrl = d.publicUrl;
+              } else if (filenameFallback) {
+                // Construct local URL pointing to frontend
+                accessibleUrl = `/pdfs/${encodeURIComponent(filenameFallback)}`;
+              }
+            }
+            
             return { ...d, accessibleUrl };
-          });
+          }));
 
           return res.json({ ...col, documents: docsWithUrls });
         }
@@ -343,6 +365,7 @@
           createdAt: c.createdAt,
           lastRunAt: c.lastRunAt,
           documentsCount: Array.isArray(c.documents) ? c.documents.length : 0,
+          firstDocument: (Array.isArray(c.documents) && c.documents.length > 0) ? c.documents[0] : null,
           persona: c.persona,
           jobToBeDone: c.jobToBeDone
         }));
@@ -518,6 +541,124 @@ router.get('/collections', async (req, res) => {
     res.json(list);
   } catch (e) {
     res.status(500).json({ error: 'Failed to fetch collections', details: e && e.message ? e.message : String(e) });
+  }
+});
+
+// Add files to an existing collection
+router.post('/collections/:collectionId/add-files', upload.array('pdfs'), async (req, res) => {
+  try {
+    const { collectionId } = req.params;
+    if (!collectionId) {
+      return res.status(400).json({ error: 'collectionId is required' });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    // Resolve userId
+    let userId = null;
+    try {
+      if (req.body && req.body.userId) {
+        userId = req.body.userId;
+      } else if (req.userId) {
+        userId = req.userId;
+      } else {
+        const authHeader = (req.headers && req.headers.authorization) || '';
+        const match = authHeader.match(/^Bearer\s+(.+)$/i);
+        if (match) {
+          const idToken = match[1];
+          try {
+            const decoded = await verifyIdToken(idToken);
+            if (decoded && decoded.uid) {
+              userId = decoded.uid;
+            }
+          } catch (e) {
+            console.warn('Failed to verify ID token:', e && e.message ? e.message : String(e));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error while resolving userId:', e && e.message ? e.message : String(e));
+    }
+
+    // Find the collection
+    const collection = await Collection.findOne({ collectionId, userId: userId || null });
+    if (!collection) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+
+    // Ensure S3 helpers are configured
+    const s3Enabled = !!(s3Helpers && process.env.S3_BUCKET && process.env.AWS_REGION);
+    if (!s3Enabled) {
+      return res.status(500).json({ error: 'S3 not configured. Set AWS_REGION and S3_BUCKET and ensure services/s3 is available.' });
+    }
+
+    // Upload new files to S3
+    const newDocuments = [];
+    const uniqueId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const frontendPdfsDir = path.resolve(__dirname, '../../frontend/public/pdfs');
+    fs.mkdirSync(frontendPdfsDir, { recursive: true });
+
+    for (const file of req.files) {
+      // Copy to frontend/public/pdfs for viewing
+      const frontendDest = path.join(frontendPdfsDir, file.originalname);
+      try {
+        fs.copyFileSync(file.path, frontendDest);
+      } catch (e) {
+        console.warn('Failed to copy to frontend PDFs:', e && e.message ? e.message : String(e));
+      }
+
+      // Upload to S3
+      try {
+        const ext = path.extname(file.originalname) || '.pdf';
+        const key = `uploads/${uniqueId}/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+        await s3Helpers.s3PutFile(file.path, key, file.mimetype || 'application/pdf');
+        let publicUrl = null;
+        try {
+          publicUrl = await s3Helpers.s3Presign(key, 60 * 60);
+        } catch (_) {
+          publicUrl = null;
+        }
+
+        newDocuments.push({
+          originalName: file.originalname,
+          storedName: key,
+          size: file.size,
+          mimeType: file.mimetype,
+          publicUrl,
+          pages: null
+        });
+
+        // Clean up temp file
+        try {
+          fs.unlinkSync(file.path);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      } catch (e) {
+        console.warn('S3 upload failed for', file.originalname, e && e.message ? e.message : String(e));
+      }
+    }
+
+    // Add new documents to collection
+    if (!Array.isArray(collection.documents)) {
+      collection.documents = [];
+    }
+    collection.documents.push(...newDocuments);
+    collection.status = 'ready'; // Mark as ready since files are added
+    await collection.save();
+
+    res.json({
+      success: true,
+      collectionId: collection.collectionId,
+      addedCount: newDocuments.length,
+      totalDocuments: collection.documents.length,
+      documents: collection.documents
+    });
+  } catch (e) {
+    console.error('Error adding files to collection:', e && e.message ? e.message : String(e));
+    res.status(500).json({ error: 'Failed to add files to collection', details: e && e.message ? e.message : String(e) });
   }
 });
 

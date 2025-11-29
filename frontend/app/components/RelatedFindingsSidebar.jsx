@@ -83,7 +83,7 @@ function RelatedFindingsSidebar({
               </button>
             </div>
             <p className="text-xs text-purple-700/80 font-medium flex items-center gap-2">
-              <div className="w-1 h-1 rounded-full bg-purple-500 animate-pulse"></div>
+              <span className="w-1 h-1 rounded-full bg-purple-500 animate-pulse inline-block"></span>
               Discover connected insights across your documents
             </p>
           </div>

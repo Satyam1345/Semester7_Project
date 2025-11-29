@@ -1,5 +1,5 @@
 "use client"
-import { PanelLeftClose, PanelLeftOpen, LogOut, Mic, Brain, PanelBottom, PanelBottomClose, Search, PanelRightClose, PanelRightOpen, BookOpen } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, LogOut, Mic, Brain, PanelBottom, PanelBottomClose, Search, PanelRightClose, PanelRightOpen, BookOpen, Home } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -79,7 +79,7 @@ function Header({ isSidebarOpen, toggleSidebar, onLogout, onTogglePodcast, onTog
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="relative overflow-hidden flex flex-row cursor-pointer group">
+          <div onClick={() => router.push('/')} className="relative overflow-hidden flex flex-row cursor-pointer group">
             
             <div className="text-2xl font-bold text-slate-100 flex relative tracking-wide">
               <span className="inline-block transition-transform hover:scale-105 duration-200">A</span>
@@ -149,7 +149,17 @@ function Header({ isSidebarOpen, toggleSidebar, onLogout, onTogglePodcast, onTog
             Generate AI insights
           </div>
         </div> */}
-        
+        <div className="group relative">
+          <button 
+            onClick={() => router.push('/')} 
+            className="p-2.5 rounded-lg bg-slate-700/50 backdrop-blur-sm border border-slate-500/30 hover:bg-slate-600/60 hover:border-slate-400/40 transition-all duration-200 shadow-md hover:shadow-lg"
+          >
+            <Home size={18} className="text-slate-200" />
+          </button>
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-slate-800/95 text-slate-200 text-xs rounded-md border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg backdrop-blur-sm">
+            Homepage
+          </div>
+        </div>
         <div className="group relative">
           <button 
             onClick={logoutHandler} 

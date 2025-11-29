@@ -60,6 +60,18 @@ export async function getHistory() {
   return res.data;
 }
 
+export async function getCollectionDetails(collectionId) {
+  if (!collectionId) throw new Error('collectionId is required');
+  const currentUser = getCurrentUser();
+  if (!currentUser || !currentUser.uid) {
+    throw new Error('User must be authenticated to view a collection');
+  }
+  const res = await apiClient.get('/api/history', {
+    params: { userId: currentUser.uid, collectionId }
+  });
+  return res.data;
+}
+
 export async function getLatestOutput() {
   const res = await apiClient.get('/api/output');
   return res.data;
@@ -68,5 +80,25 @@ export async function getLatestOutput() {
 // Related content based on selected text
 export async function getRelated(text, topK = 8) {
   const res = await apiClient.post('/api/related', { text, top_k: topK });
+  return res.data;
+}
+
+// Add files to an existing collection
+export async function addFilesToCollection(collectionId, files) {
+  if (!collectionId) throw new Error('collectionId is required');
+  const currentUser = getCurrentUser();
+  if (!currentUser || !currentUser.uid) {
+    throw new Error('User must be authenticated to add files to a collection');
+  }
+
+  const formData = new FormData();
+  files.forEach(function(file) { formData.append('pdfs', file); });
+  formData.append('userId', currentUser.uid);
+
+  const idToken = await getIdTokenForCurrentUser();
+  const headers = { 'Content-Type': 'multipart/form-data' };
+  if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+
+  const res = await apiClient.post(`/api/collections/${collectionId}/add-files`, formData, { headers });
   return res.data;
 }
