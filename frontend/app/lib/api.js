@@ -102,3 +102,21 @@ export async function addFilesToCollection(collectionId, files) {
   const res = await apiClient.post(`/api/collections/${collectionId}/add-files`, formData, { headers });
   return res.data;
 }
+
+export async function deleteCollection(collectionId) {
+  if (!collectionId) throw new Error('collectionId is required');
+  const currentUser = getCurrentUser();
+  if (!currentUser || !currentUser.uid) {
+    throw new Error('User must be authenticated to delete a collection');
+  }
+  
+  const idToken = await getIdTokenForCurrentUser();
+  const headers = {};
+  if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+
+  const res = await apiClient.delete(`/api/collections/${collectionId}`, {
+    headers,
+    params: { userId: currentUser.uid }
+  });
+  return res.data;
+}
