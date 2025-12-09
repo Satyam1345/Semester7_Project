@@ -322,6 +322,11 @@
           // - If stored in S3 (has storedName), generate fresh presigned URL
           // - Otherwise point to the frontend public pdfs folder
           const hostBase = `${req.protocol}://${req.get('host')}`;
+          const frontendPdfsDir = path.resolve(__dirname, '../../frontend/public/pdfs');
+          if (!fs.existsSync(frontendPdfsDir)) {
+             try { fs.mkdirSync(frontendPdfsDir, { recursive: true }); } catch(e) {}
+          }
+
           const docsWithUrls = await Promise.all((col.documents || []).map(async (d) => {
             const originalName = d.originalName || '';
             const storedName = d.storedName || '';
@@ -330,13 +335,36 @@
             let accessibleUrl = null;
             
             // If document is stored in S3, generate fresh presigned URL
-            if (storedName && s3Helpers && process.env.S3_BUCKET && process.env.AWS_REGION) {
-              try {
-                accessibleUrl = await s3Helpers.s3Presign(storedName, 60 * 60); // 1 hour expiry
-              } catch (e) {
-                console.warn('Failed to generate presigned URL for', storedName, e && e.message ? e.message : String(e));
-                // Fall through to local URL fallback
-              }
+            if (storedName) {
+               if (s3Helpers && process.env.S3_BUCKET && process.env.AWS_REGION) {
+                  try {
+                    accessibleUrl = await s3Helpers.s3Presign(storedName, 60 * 60); // 1 hour expiry
+                    console.log(`[API] Generated S3 URL for ${storedName}`);
+                    
+                    // Also ensure the file exists locally in frontend/public/pdfs for fallback/hybrid access
+                    if (filenameFallback) {
+                        const localDest = path.join(frontendPdfsDir, filenameFallback);
+                        if (!fs.existsSync(localDest)) {
+                            console.log(`[API] Downloading ${storedName} to local cache: ${localDest}`);
+                            try {
+                                await s3Helpers.s3GetToPath(storedName, localDest);
+                            } catch (dlErr) {
+                                console.warn(`[API] Failed to download ${storedName} to local cache:`, dlErr.message);
+                            }
+                        }
+                    }
+
+                  } catch (e) {
+                    console.warn('Failed to generate presigned URL for', storedName, e && e.message ? e.message : String(e));
+                    // Fall through to local URL fallback
+                  }
+               } else {
+                 console.warn('S3 configured incorrectly or missing helpers', { 
+                   hasHelpers: !!s3Helpers, 
+                   bucket: process.env.S3_BUCKET, 
+                   region: process.env.AWS_REGION 
+                 });
+               }
             }
             
             // Fallback to local public PDFs folder or original publicUrl
@@ -344,8 +372,8 @@
               if (d.publicUrl && !d.publicUrl.includes('localhost:5001')) {
                 // Use existing publicUrl if it's not pointing to backend
                 accessibleUrl = d.publicUrl;
-              } else if (filenameFallback) {
-                // Construct local URL pointing to frontend
+              } else if (filenameFallback && !storedName) {
+                // Construct local URL pointing to frontend ONLY if not supposed to be in S3
                 accessibleUrl = `/pdfs/${encodeURIComponent(filenameFallback)}`;
               }
             }

@@ -161,9 +161,13 @@ function PdfViewerPageContent() {
 			try {
 				const detail = await getCollectionDetails(collectionId);
 				if (cancelled) return;
+				console.log('[PDFViewer] Collection details:', detail);
 				const analysis = detail?.analysis;
 				if (analysis) {
+					console.log('[PDFViewer] Setting analysis data:', analysis);
 					setAnalysisData(analysis);
+				} else {
+					console.warn('[PDFViewer] No analysis data found in collection details');
 				}
 				const docsRaw = Array.isArray(detail?.documents) ? detail.documents : [];
 				
