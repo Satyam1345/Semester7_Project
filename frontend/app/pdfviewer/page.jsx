@@ -116,6 +116,8 @@ function PdfViewerPageContent() {
 
 	useEffect(() => {
 		if (collectionId) return;
+		// REMOVED: sessionStorage logic that was restoring old data
+		/*
 		const storedData = sessionStorage.getItem('analysisData');
 		if (storedData) {
 			const data = JSON.parse(storedData);
@@ -133,6 +135,7 @@ function PdfViewerPageContent() {
 			sessionStorage.removeItem('analysisData');
 			return;
 		}
+		*/
 
 		getLatestOutput()
 			.then((data) => {
@@ -154,10 +157,18 @@ function PdfViewerPageContent() {
 
 	useEffect(() => {
 		if (!collectionId) return;
+		
+		// Reset state before fetching new collection data
+		setAnalysisData(null);
+		setDocuments([]);
+		setDocumentUrlMap({});
+		setCollectionError(null);
+		setCollectionLoading(true);
+		
 		let cancelled = false;
 		const loadCollection = async () => {
-			setCollectionLoading(true);
-			setCollectionError(null);
+			// setCollectionLoading(true); // Already set above
+			// setCollectionError(null); // Already set above
 			try {
 				const detail = await getCollectionDetails(collectionId);
 				if (cancelled) return;
@@ -291,10 +302,11 @@ function PdfViewerPageContent() {
 		}
 		
 		// Ensure URL is absolute (for CORS and proper loading)
-		if (url && url.startsWith('/')) {
+		if (url && url.startsWith('/') && typeof window !== 'undefined') {
 			url = `${window.location.origin}${url}`;
 		}
 		
+        console.log('[PDFViewer] Computed docUrl:', url, 'for file:', selectedFile);
 		return url;
 	}, [selectedFile, documentUrlMap]);
 

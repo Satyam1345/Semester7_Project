@@ -60,31 +60,12 @@ function DashboardPageContent() {
     if (!id) return;
 
     setIsNavigating(id); // Set loading state for this collection
-    try {
-      const collectionDetails = await getCollectionDetails(id);
-      if (collectionDetails) {
-        // Save the full collection details to sessionStorage
-        sessionStorage.setItem('analysisData', JSON.stringify(collectionDetails));
-
-        // Find the first document to use in the URL
-        const firstDoc = collectionDetails.documents && collectionDetails.documents[0];
-        const fileName = firstDoc ? (firstDoc.originalName || firstDoc.storedName) : null;
-
-        if (fileName) {
-          router.push(`/pdfviewer?file=${encodeURIComponent(fileName)}`);
-        } else {
-          // Fallback if no documents are in the collection
-          router.push('/pdfviewer');
-        }
-      } else {
-        throw new Error('Collection details not found.');
-      }
-    } catch (err) {
-      setError(err?.message || 'Failed to load collection details');
-      console.error('Navigation error:', err);
-      setIsNavigating(null); // Reset loading state on error
-    }
-    // No need to reset isNavigating on success, as the page will change
+    
+    // Clear any previous session data to ensure fresh fetch
+    sessionStorage.removeItem('analysisData');
+    
+    // Navigate directly with collectionId - let the PDFViewer fetch fresh data
+    router.push(`/pdfviewer?collectionId=${id}`);
   };
 
   const formatDate = (dateString) => {

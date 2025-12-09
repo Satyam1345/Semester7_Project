@@ -342,20 +342,37 @@
             if (storedName) {
                if (s3Helpers && process.env.S3_BUCKET && process.env.AWS_REGION) {
                   try {
-                    accessibleUrl = await s3Helpers.s3Presign(storedName, 60 * 60); // 1 hour expiry
+                    const s3Url = await s3Helpers.s3Presign(storedName, 60 * 60); // 1 hour expiry
                     console.log(`[API] Generated S3 URL for ${storedName}`);
                     
                     // Also ensure the file exists locally in frontend/public/pdfs for fallback/hybrid access
                     if (filenameFallback) {
                         const localDest = path.join(frontendPdfsDir, filenameFallback);
-                        if (!fs.existsSync(localDest)) {
+                        
+                        // Check if file exists or needs downloading
+                        let fileExists = fs.existsSync(localDest);
+                        if (!fileExists) {
                             console.log(`[API] Downloading ${storedName} to local cache: ${localDest}`);
                             try {
                                 await s3Helpers.s3GetToPath(storedName, localDest);
+                                fileExists = true; // Mark as existing after successful download
                             } catch (dlErr) {
                                 console.warn(`[API] Failed to download ${storedName} to local cache:`, dlErr.message);
                             }
                         }
+                        
+                        // FORCE LOCAL URL TO AVOID CORS ISSUES
+                        // Since we have the file locally, serve it from the frontend's public folder
+                        // This avoids S3 CORS errors on localhost
+                        if (fileExists) {
+                            accessibleUrl = `/pdfs/${encodeURIComponent(filenameFallback)}`;
+                            console.log(`[API] Using local cached URL for ${storedName} to avoid CORS: ${accessibleUrl}`);
+                        } else {
+                            console.warn(`[API] Local file missing for ${storedName}, falling back to S3 URL (CORS risk)`);
+                            accessibleUrl = s3Url;
+                        }
+                    } else {
+                        accessibleUrl = s3Url;
                     }
 
                   } catch (e) {
@@ -434,6 +451,7 @@
              }
           }
 
+          console.log(`[API] Returning ${docsWithUrls.length} documents for collection ${collectionId}`);
           return res.json({ ...col, documents: docsWithUrls });
         }
 
