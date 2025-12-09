@@ -126,7 +126,7 @@ function Header({ isSidebarOpen, toggleSidebar, onLogout, onTogglePodcast, onTog
           </div>
         </div>
         
-        {/* <div className="group relative">
+        <div className="group relative">
           <button 
             onClick={onTogglePodcast} 
             className="p-2.5 rounded-lg bg-slate-700/50 backdrop-blur-sm border border-slate-500/30 hover:bg-slate-600/60 hover:border-slate-400/40 transition-all duration-200 shadow-md hover:shadow-lg"
@@ -136,9 +136,9 @@ function Header({ isSidebarOpen, toggleSidebar, onLogout, onTogglePodcast, onTog
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-slate-800/95 text-slate-200 text-xs rounded-md border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg backdrop-blur-sm">
             Generate podcast
           </div>
-        </div> */}
+        </div>
         
-        {/* <div className="group relative">
+        <div className="group relative">
           <button 
             onClick={onToggleInsights} 
             className="p-2.5 rounded-lg bg-slate-700/50 backdrop-blur-sm border border-slate-500/30 hover:bg-slate-600/60 hover:border-slate-400/40 transition-all duration-200 shadow-md hover:shadow-lg"
@@ -148,7 +148,7 @@ function Header({ isSidebarOpen, toggleSidebar, onLogout, onTogglePodcast, onTog
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-slate-800/95 text-slate-200 text-xs rounded-md border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg backdrop-blur-sm">
             Generate AI insights
           </div>
-        </div> */}
+        </div>
         <div className="group relative">
           <button 
             onClick={() => router.push('/')} 
