@@ -125,6 +125,8 @@ export default function PodcastSidebar({ isOpen, onClose }) {
     }
   };
 
+  return null;
+  /*
   return (
     <div className={`transition-all duration-300 ease-in-out bg-red-50 border-l border-red-200 text-red-700 p-4 shadow-lg h-full ${isOpen ? 'w-full md:w-[19rem] shrink-0 flex-none' : 'w-0'}`}> 
 
@@ -211,4 +213,5 @@ export default function PodcastSidebar({ isOpen, onClose }) {
       </div>
     </div>
   );
+  */
 }
