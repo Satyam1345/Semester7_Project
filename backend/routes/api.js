@@ -112,6 +112,9 @@
       }
 
       // Also include all existing PDFs in frontend/public/pdfs into this collection for analysis
+      // REMOVED: This was causing cross-contamination of collections. 
+      // Only files explicitly uploaded for this collection should be analyzed.
+      /*
       try {
         const existing = fs.readdirSync(frontendPdfsDir).filter((f) => f.toLowerCase().endsWith('.pdf'));
         for (const pdfName of existing) {
@@ -124,6 +127,7 @@
       } catch (e) {
         console.warn('Warning: Could not enumerate existing PDFs:', e.message || e);
       }
+      */
 
       const collectionName = req.body.collectionName;
       
@@ -384,6 +388,8 @@
           // Fix for frontend display: Ensure extracted_sections has section_name and refined_text
           if (col.analysis && Array.isArray(col.analysis.extracted_sections)) {
             console.log(`[API] Processing ${col.analysis.extracted_sections.length} sections for frontend compatibility.`);
+            
+            // 1. Map fields first (preserving indices for subsection_analysis lookup)
             col.analysis.extracted_sections = col.analysis.extracted_sections.map((section, idx) => {
               // Map section_title to section_name if needed
               if (!section.section_name && section.section_title) {
@@ -399,6 +405,24 @@
               }
               return section;
             });
+
+            // 2. Filter out sections that don't belong to this collection's documents
+            const validDocuments = new Set((col.documents || []).map(d => d.originalName));
+            if (validDocuments.size > 0) {
+                const originalCount = col.analysis.extracted_sections.length;
+                col.analysis.extracted_sections = col.analysis.extracted_sections.filter(section => 
+                    validDocuments.has(section.document)
+                );
+                
+                // Also filter subsection_analysis to match
+                if (col.analysis.subsection_analysis && Array.isArray(col.analysis.subsection_analysis)) {
+                    col.analysis.subsection_analysis = col.analysis.subsection_analysis.filter(section => 
+                        validDocuments.has(section.document)
+                    );
+                }
+                console.log(`[API] Filtered analysis sections from ${originalCount} to ${col.analysis.extracted_sections.length} based on collection documents.`);
+            }
+
             console.log(`[API] Enhanced ${col.analysis.extracted_sections.length} sections with frontend fields for collection ${collectionId}`);
             if (col.analysis.extracted_sections.length > 0) {
                 console.log('[API] Sample enhanced section:', JSON.stringify(col.analysis.extracted_sections[0], null, 2));
