@@ -643,68 +643,6 @@ router.get('/collections', async (req, res) => {
   }
 });
 
-// Delete a collection
-router.delete('/collections/:collectionId', async (req, res) => {
-  try {
-    const { collectionId } = req.params;
-    const { userId } = req.query; // Or from auth middleware if you prefer
-
-    if (!collectionId) {
-      return res.status(400).json({ error: 'collectionId is required' });
-    }
-    
-    // If you have auth middleware that sets req.userId, use that. 
-    // Otherwise, rely on query param but verify it matches the token if possible.
-    // For now, we'll assume the caller provides the correct userId or we trust the token.
-    
-    let effectiveUserId = userId;
-    if (!effectiveUserId && req.userId) {
-        effectiveUserId = req.userId;
-    }
-    
-    if (!effectiveUserId) {
-        // Try to get from token
-        const authHeader = (req.headers && req.headers.authorization) || '';
-        const match = authHeader.match(/^Bearer\s+(.+)$/i);
-        if (match) {
-            try {
-                const decoded = await verifyIdToken(match[1]);
-                if (decoded && decoded.uid) effectiveUserId = decoded.uid;
-            } catch(e) {}
-        }
-    }
-
-    if (!effectiveUserId) {
-        return res.status(401).json({ error: 'Unauthorized: userId required' });
-    }
-
-    console.log(`Attempting to delete collection. ID: ${collectionId}, User: ${effectiveUserId}`);
-
-    let result = await Collection.findOneAndDelete({ collectionId, userId: effectiveUserId });
-    
-    // Fallback: try deleting by _id if collectionId didn't match
-    if (!result && /^[0-9a-fA-F]{24}$/.test(collectionId)) {
-        console.log(`Collection not found by collectionId, trying _id: ${collectionId}`);
-        result = await Collection.findOneAndDelete({ _id: collectionId, userId: effectiveUserId });
-    }
-    
-    if (!result) {
-      console.log('Delete failed: Collection not found or access denied');
-      return res.status(404).json({ error: 'Collection not found or access denied' });
-    }
-
-    // Optional: Clean up S3 files or local files if they are specific to this collection
-    // Since we use unique IDs for uploads, we could potentially delete the folder in uploads/
-    // But we'd need to know the path. The Collection model doesn't strictly store the upload path,
-    // but we can infer it if we stored it or just leave it for a separate cleanup job.
-    
-    res.json({ success: true, message: 'Collection deleted successfully' });
-  } catch (e) {
-    console.error('Delete collection error:', e);
-    res.status(500).json({ error: 'Failed to delete collection', details: e.message });
-  }
-});
-
 // Add files to an existing collection
 router.post('/collections/:collectionId/add-files', upload.array('pdfs'), async (req, res) => {
   try {

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { useAuth } from "@/app/context/AuthContext";
-import { getHistory, getCollectionDetails, deleteCollection } from '@/app/lib/api';
+import { getHistory, getCollectionDetails } from '@/app/lib/api';
 import { 
   Loader2, 
   FileText, 
@@ -16,8 +16,7 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  ArrowRight,
-  Trash2
+  ArrowRight
 } from 'lucide-react';
 
 function DashboardPageContent() {
@@ -54,20 +53,6 @@ function DashboardPageContent() {
   };
 
   const [isNavigating, setIsNavigating] = useState(null); // new state for loading
-
-  const handleDelete = async (e, collectionId) => {
-    e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this collection? This action cannot be undone.')) return;
-
-    try {
-      await deleteCollection(collectionId);
-      setCollections(prev => prev.filter(c => (c.collectionId || c._id) !== collectionId));
-    } catch (err) {
-      console.error('Failed to delete collection:', err);
-      const errorMessage = err.response?.data?.error || err.message || 'Unknown error';
-      alert('Failed to delete collection: ' + errorMessage);
-    }
-  };
 
   const handleCollectionClick = async (collection) => {
     if (!collection || isNavigating) return;
@@ -269,19 +254,10 @@ function DashboardPageContent() {
                 {/* Card Header */}
                 <div className="p-5 border-b border-white/20">
                   <div className="flex items-start justify-between">
-                    <h3 className="text-lg font-extrabold text-red-800 line-clamp-2 group-hover:text-red-600 transition-colors flex-1 mr-2">
+                    <h3 className="text-lg font-extrabold text-red-800 line-clamp-2 group-hover:text-red-600 transition-colors">
                       {collection.name || 'Unnamed Collection'}
                     </h3>
-                    <div className="flex items-center space-x-2 flex-shrink-0">
-                      {getStatusBadge(collection.status || 'idle')}
-                      <button
-                        onClick={(e) => handleDelete(e, collection.collectionId || collection._id)}
-                        className="p-1.5 hover:bg-red-100 rounded-full transition-colors text-red-400 hover:text-red-600"
-                        title="Delete Collection"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {getStatusBadge(collection.status || 'idle')}
                   </div>
                 </div>
 
