@@ -161,10 +161,18 @@ function PdfViewerPageContent() {
 			try {
 				const detail = await getCollectionDetails(collectionId);
 				if (cancelled) return;
-				console.log('[PDFViewer] Collection details:', detail);
+				console.log('[PDFViewer] Collection details received:', detail);
 				const analysis = detail?.analysis;
 				if (analysis) {
 					console.log('[PDFViewer] Setting analysis data:', analysis);
+                    if (analysis.extracted_sections) {
+                        console.log('[PDFViewer] Extracted sections count:', analysis.extracted_sections.length);
+                        if (analysis.extracted_sections.length > 0) {
+                            console.log('[PDFViewer] First section sample:', analysis.extracted_sections[0]);
+                        }
+                    } else {
+                        console.warn('[PDFViewer] No extracted_sections in analysis object');
+                    }
 					setAnalysisData(analysis);
 				} else {
 					console.warn('[PDFViewer] No analysis data found in collection details');

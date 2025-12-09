@@ -4,15 +4,30 @@ import { X, ChevronRight, BookOpen, Eye } from 'lucide-react';
 export default function AnalysisOverviewSidebar({ isOpen, onClose, analysisData, selectedFile, onNavigate, onViewSubsections }) {
   if (!isOpen) return null;
 
+  console.log('[Sidebar] Render. analysisData:', analysisData);
+  if (analysisData) {
+      console.log('[Sidebar] extracted_sections type:', typeof analysisData.extracted_sections);
+      console.log('[Sidebar] Is array?', Array.isArray(analysisData.extracted_sections));
+      console.log('[Sidebar] Length:', analysisData.extracted_sections?.length);
+  }
+
   // Backend returns "extracted_sections" not "highlighted_sections"
-  const highlightedSections = Array.isArray(analysisData?.extracted_sections) 
-    ? analysisData.extracted_sections 
-    : [];
+  // Handle potential nesting or direct access
+  let highlightedSections = [];
+  if (analysisData) {
+    if (Array.isArray(analysisData.extracted_sections)) {
+      highlightedSections = analysisData.extracted_sections;
+    } else if (analysisData.analysis && Array.isArray(analysisData.analysis.extracted_sections)) {
+      highlightedSections = analysisData.analysis.extracted_sections;
+    }
+  }
   
+  console.log('[Sidebar] Final highlightedSections length:', highlightedSections.length);
+
   // Backend returns subsections separately in "subsection_analysis" array
   const subsections = Array.isArray(analysisData?.subsection_analysis)
     ? analysisData.subsection_analysis
-    : [];	return (
+    : (analysisData?.analysis?.subsection_analysis || []);	return (
 		<div className={`fixed right-0 top-0 h-full w-[420px] bg-gradient-to-br from-slate-50 via-white to-blue-50/30 shadow-2xl z-40 flex flex-col border-l border-slate-200 transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
 			{/* Header */}
 			<div className="flex-none p-6 border-b border-slate-200/70 bg-gradient-to-r from-slate-100/50 to-blue-100/30">
@@ -67,11 +82,11 @@ export default function AnalysisOverviewSidebar({ isOpen, onClose, analysisData,
 								)}
 								
 								<div className="text-sm font-semibold text-slate-800 mb-2 line-clamp-2">
-									{section.section_name}
+									{section.section_name || section.section_title || 'Untitled Section'}
 								</div>
 								
 								<div className="text-xs text-slate-600 line-clamp-3 leading-relaxed mb-3">
-									{section.refined_text}
+									{section.refined_text || (subsections[idx] && subsections[idx].refined_text) || 'No content available'}
 								</div>
 
 								{/* Action Buttons */}

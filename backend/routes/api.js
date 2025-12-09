@@ -381,6 +381,35 @@
             return { ...d, accessibleUrl };
           }));
 
+          // Fix for frontend display: Ensure extracted_sections has section_name and refined_text
+          if (col.analysis && Array.isArray(col.analysis.extracted_sections)) {
+            console.log(`[API] Processing ${col.analysis.extracted_sections.length} sections for frontend compatibility.`);
+            col.analysis.extracted_sections = col.analysis.extracted_sections.map((section, idx) => {
+              // Map section_title to section_name if needed
+              if (!section.section_name && section.section_title) {
+                section.section_name = section.section_title;
+              }
+              // Map refined_text from subsection_analysis if needed (assuming parallel arrays)
+              if (!section.refined_text && 
+                  col.analysis.subsection_analysis && 
+                  Array.isArray(col.analysis.subsection_analysis) &&
+                  col.analysis.subsection_analysis[idx] && 
+                  col.analysis.subsection_analysis[idx].refined_text) {
+                section.refined_text = col.analysis.subsection_analysis[idx].refined_text;
+              }
+              return section;
+            });
+            console.log(`[API] Enhanced ${col.analysis.extracted_sections.length} sections with frontend fields for collection ${collectionId}`);
+            if (col.analysis.extracted_sections.length > 0) {
+                console.log('[API] Sample enhanced section:', JSON.stringify(col.analysis.extracted_sections[0], null, 2));
+            }
+          } else {
+             console.log('[API] No extracted_sections found in analysis object for collection', collectionId);
+             if (col.analysis) {
+                 console.log('[API] Analysis keys:', Object.keys(col.analysis));
+             }
+          }
+
           return res.json({ ...col, documents: docsWithUrls });
         }
 
